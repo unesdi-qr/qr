@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente Menu</title>
+    <link rel="stylesheet" href="menu.css">
+</head>
+<body>
+    <div class="menu-container">
+        <div id="menu-content"></div>
+    </div>
+    
+
+    <!-- Firebase Scripts (Modular SDK) -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+        import { getStorage, ref, listAll, getDownloadURL } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-storage.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFU2ZnJ1oh-7R5QkFEmoUOevQcTQ0mZ_w",
+            authDomain: "qr-menu-383cd.firebaseapp.com",
+            projectId: "qr-menu-383cd",
+            storageBucket: "qr-menu-383cd.appspot.com",
+            messagingSenderId: "98382457208",
+            appId: "1:98382457208:web:d7d5acb86901141134008d"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const auth = getAuth(app);
+
+        // Get the clientId from the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const clientId = urlParams.get('clientId');
+
+        // Function to list uploaded PDFs
+        function listUploadedPDFs(clientId, clientName) {
+            const userStorageRef = ref(storage, `pdfs/${clientId}`);
+            listAll(userStorageRef).then((res) => {
+                if (res.items.length === 1) {
+                    // Only one PDF, open it directly
+                    getDownloadURL(res.items[0]).then((url) => {
+                        window.location.href = url;
+                    });
+                } else if (res.items.length > 1) {
+                    // More than one PDF, list them
+                    const menuContent = document.getElementById('menu-content');
+                    menuContent.innerHTML = `
+                        <h1>${clientName}</h1>
+                        <h2>Selecciona una carta</h2>
+                        <div id="menu-list"></div>
+                    `;
+                    const menuList = document.getElementById('menu-list');
+                    res.items.forEach((itemRef) => {
+                        getDownloadURL(itemRef).then((url) => {
+                            const listItem = document.createElement('div');
+                            listItem.classList.add('menu-item');
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.setAttribute('target', '_blank'); // Open link in new tab
+                            link.innerHTML = itemRef.name;
+                            listItem.appendChild(link);
+                            menuList.appendChild(listItem);
+                        });
+                    });
+                } else {
+                    document.getElementById('menu-content').innerHTML = '<p>No hay cartas disponibles.</p>';
+                }
+            }).catch((error) => {
+                console.log(error.message);
+                document.getElementById('menu-content').innerHTML = '<p>Error al cargar las cartas.</p>';
+            });
+        }
+
+        // Fetch client data and display menu
+        function fetchClientData(clientId) {
+            const clientDocRef = doc(db, 'clients', clientId);
+            getDoc(clientDocRef).then((doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    listUploadedPDFs(clientId, data.name); // List PDFs for this client
+                } else {
+                    document.getElementById('menu-content').innerHTML = '<p>No se encontró el cliente.</p>';
+                }
+            }).catch((error) => {
+                console.error('Error al obtener el documento del cliente:', error);
+                document.getElementById('menu-content').innerHTML = '<p>Error al cargar el menú.</p>';
+            });
+        }
+
+        // Fetch client data when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            if (clientId) {
+                fetchClientData(clientId);
+            } else {
+                document.getElementById('menu-content').innerHTML = '<p>ID de cliente no válido.</p>';
+            }
+        });
+    </script>
+</body>
+</html>
